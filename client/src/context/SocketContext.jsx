@@ -3,7 +3,7 @@ import { io } from 'socket.io-client';
 
 const SocketContext = createContext(null);
 
-const SERVER_URL = process.env.NODE_ENV === 'production'
+const SERVER_URL = import.meta.env.PROD
   ? "https://vitstellar-tambola.onrender.com"
   : `${window.location.protocol}//${window.location.hostname}:3001`;
 
