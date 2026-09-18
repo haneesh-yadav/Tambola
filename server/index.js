@@ -15,6 +15,11 @@ const MAX_WINNERS = {
   fullHouse: 3,
 };
 
+// ─── Host Access ───────────────────────────────────────────────────────────
+// Fixed password required to create a room or access the host controls.
+// Anyone who knows this can host — change it here to rotate it.
+const HOST_PASSWORD = process.env.HOST_PASSWORD || 'gravitas26stellar';
+
 const app = express();
 const server = http.createServer(app);
 
@@ -227,7 +232,12 @@ io.on('connection', (socket) => {
   console.log(`[+] Connected: ${socket.id}`);
 
   // Create a new room (called by host)
-  socket.on('room:create', () => {
+  socket.on('room:create', ({ password } = {}) => {
+    const pw = typeof password === 'string' ? password.trim() : '';
+    if (pw !== HOST_PASSWORD) {
+      socket.emit('error', { message: 'Incorrect host password.' });
+      return;
+    }
     const roomId = generateRoomId();
     createRoom(roomId, socket.id);
     socket.roomId = roomId;
@@ -238,8 +248,9 @@ io.on('connection', (socket) => {
     console.log(`[ROOM CREATED] ${roomId} by host: ${socket.id}`);
   });
 
-  // Host joins/reconnects to a room
-  socket.on('host:join', ({ roomId }) => {
+  // Host joins/reconnects to a room (password required so only someone
+  // who knows the fixed host password can reach the host controls)
+  socket.on('host:join', ({ roomId, password } = {}) => {
     if (!roomId) {
       socket.emit('error', { message: 'Room ID is required.' });
       return;
@@ -247,6 +258,11 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     if (!room) {
       socket.emit('error', { message: 'Room not found.' });
+      return;
+    }
+
+    if ((typeof password === 'string' ? password.trim() : '') !== HOST_PASSWORD) {
+      socket.emit('host:authError', { message: 'Incorrect host password.' });
       return;
     }
 

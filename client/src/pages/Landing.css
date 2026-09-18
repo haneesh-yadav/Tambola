@@ -29,6 +29,36 @@
   pointer-events: none;
 }
 
+.brand-bar {
+  position: absolute;
+  top: 20px;
+  left: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.brand-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.brand-logo {
+  height: 34px;
+  width: auto;
+  max-width: 96px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.35));
+}
+
+.brand-logo--vit {
+  height: 30px;
+}
+
 .landing-content {
   max-width: 600px;
   width: 100%;
@@ -275,7 +305,11 @@
 
 @media (max-width: 480px) {
   .landing { padding: 16px; }
-  .landing-content { gap: 24px; }
+  .landing-content { gap: 24px; margin-top: 46px; }
   .landing-card { padding: 18px; gap: 14px; }
   .lcard-text h2 { font-size: 16px; }
+  .brand-bar { top: 12px; left: 14px; right: 14px; }
+  .brand-logo { height: 24px; max-width: 68px; }
+  .brand-logo--vit { height: 22px; }
+  .brand-bar-right { gap: 10px; }
 }

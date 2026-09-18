@@ -46,6 +46,29 @@ export default function Host() {
   const [showReset, setShowReset] = useState(false);
   const prevNumRef = useRef(null);
 
+  // ── Host password gate ──────────────────────────────────────────────────
+  const [authenticated, setAuthenticated] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [authError, setAuthError] = useState('');
+  const pwAttemptRef = useRef('');
+  const triedStoredRef = useRef(false);
+
+  const storageKey = `tambola_host_pw_${roomId}`;
+
+  function attemptJoin(pw) {
+    pwAttemptRef.current = pw;
+    setAuthChecking(true);
+    setAuthError('');
+    socket?.emit('host:join', { roomId, password: pw });
+  }
+
+  function submitPassword(e) {
+    e.preventDefault();
+    if (!passwordInput.trim()) return;
+    attemptJoin(passwordInput.trim());
+  }
+
   function copyInviteLink() {
     const link = `${window.location.origin}/play/${roomId}`;
     navigator.clipboard.writeText(link).then(() => {
@@ -66,11 +89,35 @@ export default function Host() {
   useEffect(() => {
     if (!socket || !roomId || !connected) return;
 
-    socket.emit('host:join', { roomId });
+    // Try a password stored from creating this room / a previous unlock
+    // in this tab before falling back to the manual password gate.
+    const stored = sessionStorage.getItem(storageKey);
+    if (stored && !triedStoredRef.current) {
+      triedStoredRef.current = true;
+      attemptJoin(stored);
+    } else if (!stored) {
+      setAuthChecking(false);
+    }
 
     socket.on('host:joined', ({ state }) => {
       setGameState(state);
       setAutoDelay((state.autoCallDelay || 5000) / 1000);
+      sessionStorage.setItem(storageKey, pwAttemptRef.current);
+      setAuthenticated(true);
+      setAuthChecking(false);
+      setAuthError('');
+    });
+
+    socket.on('host:authError', ({ message }) => {
+      sessionStorage.removeItem(storageKey);
+      setAuthenticated(false);
+      setAuthChecking(false);
+      setAuthError(message || 'Incorrect password.');
+    });
+
+    socket.on('error', ({ message }) => {
+      setAuthChecking(false);
+      setAuthError(message || 'Something went wrong.');
     });
 
     socket.on('host:playerUpdate', ({ playerCount, players: pl }) => {
@@ -127,6 +174,8 @@ export default function Host() {
 
     return () => {
       socket.off('host:joined');
+      socket.off('host:authError');
+      socket.off('error');
       socket.off('host:playerUpdate');
       socket.off('host:autoCallStatus');
       socket.off('number:called');
@@ -185,6 +234,48 @@ export default function Host() {
     { key: 'earlyFive', label: 'Early Five', icon: 'filter_5' },
     { key: 'fullHouse', label: 'Full House', icon: 'home' },
   ];
+
+  // Host controls are locked behind a password so only the person who
+  // created the room (or someone who knows the password) can reach them.
+  if (!authenticated) {
+    return (
+      <div className="host-page host-auth-gate">
+        <div className="auth-card animate-fadeUp">
+          <span className="material-icons auth-icon">lock</span>
+          <h1 className="auth-title">Host Access Required</h1>
+          <p className="auth-desc">
+            Enter the host password for room <b>{roomId}</b> to unlock the controls.
+          </p>
+          <form onSubmit={submitPassword} className="auth-form">
+            <input
+              type="password"
+              className="auth-input"
+              placeholder="Host password"
+              value={passwordInput}
+              onChange={e => setPasswordInput(e.target.value)}
+              autoFocus
+              disabled={authChecking && !authError}
+            />
+            {authError && <p className="auth-error">{authError}</p>}
+            <button
+              type="submit"
+              className="btn btn-gold btn-lg"
+              disabled={!connected || (authChecking && !authError)}
+            >
+              <span className="material-icons">
+                {authChecking && !authError ? 'hourglass_top' : 'login'}
+              </span>
+              {authChecking && !authError ? 'Checking…' : 'Unlock Host Panel'}
+            </button>
+          </form>
+          <button className="btn btn-outline" onClick={() => navigate('/')}>
+            <span className="material-icons">arrow_back</span>
+            Back to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="host-page">
